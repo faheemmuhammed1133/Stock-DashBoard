@@ -1,0 +1,6 @@
+flask==3.0.3
+yfinance==0.2.54
+requests
+python-dotenv
+openpyxl==3.1.5
+gunicorn==22.0.0

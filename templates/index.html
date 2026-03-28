@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockPulse — Market Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+
+<body>
+
+  <!-- ====== TICKER TAPE ====== -->
+  <div class="ticker-wrap" aria-hidden="true">
+    <div class="ticker-track">
+      <span class="tick up">NIFTY&nbsp;50 <em>24,632.40 ▲ +0.42%</em></span>
+      <span class="tick dn">SENSEX <em>81,090.14 ▼ −0.18%</em></span>
+      <span class="tick up">RELIANCE <em>2,847.60 ▲ +1.24%</em></span>
+      <span class="tick up">TCS <em>3,510.20 ▲ +0.76%</em></span>
+      <span class="tick dn">INFY <em>1,428.90 ▼ −0.33%</em></span>
+      <span class="tick up">HDFCBANK <em>1,651.00 ▲ +0.55%</em></span>
+      <span class="tick up">BANKNIFTY <em>51,204.30 ▲ +0.29%</em></span>
+      <span class="tick dn">TATAMOTORS <em>920.40 ▼ −0.89%</em></span>
+      <span class="tick up">WIPRO <em>482.10 ▲ +0.67%</em></span>
+      <span class="tick dn">BAJFINANCE <em>7,104.55 ▼ −0.41%</em></span>
+      <span class="tick up">NIFTY&nbsp;50 <em>24,632.40 ▲ +0.42%</em></span>
+      <span class="tick dn">SENSEX <em>81,090.14 ▼ −0.18%</em></span>
+      <span class="tick up">RELIANCE <em>2,847.60 ▲ +1.24%</em></span>
+      <span class="tick up">TCS <em>3,510.20 ▲ +0.76%</em></span>
+      <span class="tick dn">INFY <em>1,428.90 ▼ −0.33%</em></span>
+      <span class="tick up">HDFCBANK <em>1,651.00 ▲ +0.55%</em></span>
+      <span class="tick up">BANKNIFTY <em>51,204.30 ▲ +0.29%</em></span>
+      <span class="tick dn">TATAMOTORS <em>920.40 ▼ −0.89%</em></span>
+      <span class="tick up">WIPRO <em>482.10 ▲ +0.67%</em></span>
+      <span class="tick dn">BAJFINANCE <em>7,104.55 ▼ −0.41%</em></span>
+    </div>
+  </div>
+
+  <!-- ====== HEADER ====== -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <svg class="brand-logo" width="26" height="26" viewBox="0 0 28 28" fill="none">
+          <polygon points="14,2 26,24 2,24" fill="none" stroke="#E94560" stroke-width="2.5" stroke-linejoin="round" />
+          <line x1="14" y1="10" x2="14" y2="18" stroke="#E94560" stroke-width="2.2" stroke-linecap="round" />
+          <circle cx="14" cy="21.5" r="1.3" fill="#E94560" />
+        </svg>
+        <span class="brand-name">StockPulse</span>
+      </div>
+      <div class="header-right">
+        <span class="market-pill">
+          <span class="mpill-dot"></span>NSE · BSE · F&amp;O
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====== HERO SEARCH ====== -->
+  <section class="search-section">
+    <div class="container">
+      <div class="hero-text">
+        <h2 class="hero-title">Indian Market Dashboard</h2>
+        <p class="hero-sub">Search any equity, index, or futures contract — real-time data from NSE India, explained
+          simply.</p>
+      </div>
+
+      <div class="search-bar-wrap">
+        <div class="search-icon-wrap">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+        </div>
+        <input type="text" id="symbolInput" class="search-input" placeholder="RELIANCE · NIFTY50 · TATAMOTORS FUT…"
+          autocomplete="off" spellcheck="false" />
+        <button class="search-btn" id="searchBtn" onclick="doSearch()">
+          <span id="searchBtnLabel">SEARCH</span>
+        </button>
+      </div>
+
+      <div class="search-meta-row">
+        <span class="search-hint">Supports Equity · Indices · Futures</span>
+        {% if history %}
+        <div class="search-history">
+          <span class="history-label">Recent:</span>
+          {% for sym in history %}
+          <button class="history-chip" onclick="searchSymbol('{{ sym }}')">{{ sym }}</button>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div id="errorBanner" class="error-banner hidden">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span id="errorMsg"></span>
+      </div>
+
+      <!-- ── Quick Pick Grid ── -->
+      <div class="quickpick-wrap">
+
+        <div class="qp-section">
+          <span class="qp-label">Indices</span>
+          <div class="qp-row">
+            <button class="qp-card qp-index" onclick="searchSymbol('NIFTY50')">
+              <span class="qp-sym">NIFTY 50</span>
+              <span class="qp-sub">NSE Benchmark</span>
+            </button>
+            <button class="qp-card qp-index" onclick="searchSymbol('SENSEX')">
+              <span class="qp-sym">SENSEX</span>
+              <span class="qp-sub">BSE Benchmark</span>
+            </button>
+            <button class="qp-card qp-index" onclick="searchSymbol('BANKNIFTY')">
+              <span class="qp-sym">BANKNIFTY</span>
+              <span class="qp-sub">Banking Index</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="qp-section">
+          <span class="qp-label">Nifty 50 — Large Cap</span>
+          <div class="qp-row">
+            <button class="qp-card" onclick="searchSymbol('RELIANCE')"><span class="qp-sym">RELIANCE</span><span
+                class="qp-sub">Reliance Industries</span></button>
+            <button class="qp-card" onclick="searchSymbol('TCS')"><span class="qp-sym">TCS</span><span
+                class="qp-sub">Tata Consultancy</span></button>
+            <button class="qp-card" onclick="searchSymbol('HDFCBANK')"><span class="qp-sym">HDFCBANK</span><span
+                class="qp-sub">HDFC Bank</span></button>
+            <button class="qp-card" onclick="searchSymbol('INFY')"><span class="qp-sym">INFY</span><span
+                class="qp-sub">Infosys</span></button>
+            <button class="qp-card" onclick="searchSymbol('ICICIBANK')"><span class="qp-sym">ICICIBANK</span><span
+                class="qp-sub">ICICI Bank</span></button>
+            <button class="qp-card" onclick="searchSymbol('HINDUNILVR')"><span class="qp-sym">HINDUNILVR</span><span
+                class="qp-sub">Hindustan Unilever</span></button>
+            <button class="qp-card" onclick="searchSymbol('SBIN')"><span class="qp-sym">SBIN</span><span
+                class="qp-sub">State Bank of India</span></button>
+            <button class="qp-card" onclick="searchSymbol('BAJFINANCE')"><span class="qp-sym">BAJFINANCE</span><span
+                class="qp-sub">Bajaj Finance</span></button>
+            <button class="qp-card" onclick="searchSymbol('TATAMOTORS')"><span class="qp-sym">TATAMOTORS</span><span
+                class="qp-sub">Tata Motors</span></button>
+            <button class="qp-card" onclick="searchSymbol('WIPRO')"><span class="qp-sym">WIPRO</span><span
+                class="qp-sub">Wipro</span></button>
+            <button class="qp-card" onclick="searchSymbol('AXISBANK')"><span class="qp-sym">AXISBANK</span><span
+                class="qp-sub">Axis Bank</span></button>
+            <button class="qp-card" onclick="searchSymbol('MARUTI')"><span class="qp-sym">MARUTI</span><span
+                class="qp-sub">Maruti Suzuki</span></button>
+            <button class="qp-card" onclick="searchSymbol('LT')"><span class="qp-sym">L&amp;T</span><span
+                class="qp-sub">Larsen &amp; Toubro</span></button>
+            <button class="qp-card" onclick="searchSymbol('KOTAKBANK')"><span class="qp-sym">KOTAKBANK</span><span
+                class="qp-sub">Kotak Mahindra</span></button>
+            <button class="qp-card" onclick="searchSymbol('SUNPHARMA')"><span class="qp-sym">SUNPHARMA</span><span
+                class="qp-sub">Sun Pharma</span></button>
+            <button class="qp-card" onclick="searchSymbol('ADANIENT')"><span class="qp-sym">ADANIENT</span><span
+                class="qp-sub">Adani Enterprises</span></button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ====== SKELETON ====== -->
+  <div id="skeleton" class="container skeleton-wrap hidden">
+    <div class="skel-row">
+      <div class="skel-block w240 h28"></div>
+      <div class="skel-block w140 h44" style="margin-left:auto"></div>
+    </div>
+    <div class="skeleton-grid">
+      <div class="skeleton-card" style="--sd:0s"></div>
+      <div class="skeleton-card" style="--sd:.08s"></div>
+      <div class="skeleton-card" style="--sd:.16s"></div>
+      <div class="skeleton-card" style="--sd:.24s"></div>
+      <div class="skeleton-card" style="--sd:.32s"></div>
+      <div class="skeleton-card" style="--sd:.4s"></div>
+    </div>
+    <div class="skel-block h220 br10" style="margin-top:20px;--sd:.2s"></div>
+  </div>
+
+  <!-- ====== DASHBOARD ====== -->
+  <main id="dashboard" class="container dashboard hidden">
+
+    <!-- Stock Header -->
+    <div class="stock-header">
+      <div class="stock-meta">
+        <div class="stock-name-row">
+          <h1 id="stockName" class="stock-name">—</h1>
+          <span id="instrumentBadge" class="badge">EQUITY</span>
+        </div>
+        <div class="stock-sub-row">
+          <span id="changePill" class="change-pill neutral">—</span>
+          <span id="indexNote" class="index-note hidden"></span>
+        </div>
+      </div>
+      <div class="ltp-block">
+        <span class="ltp-label">LAST TRADED PRICE</span>
+        <div class="ltp-row">
+          <span class="ltp-rupee">₹</span>
+          <span id="ltp" class="ltp-value">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card" style="--sd:.04s">
+        <div class="stat-label">Open</div>
+        <div class="stat-value" id="statOpen">—</div>
+      </div>
+      <div class="stat-card" style="--sd:.08s">
+        <div class="stat-label">Prev Close</div>
+        <div class="stat-value" id="statClose">—</div>
+      </div>
+      <div class="stat-card accent-green" style="--sd:.12s">
+        <div class="stat-label">↑ Upper Circuit</div>
+        <div class="stat-value" id="statUpper">—</div>
+      </div>
+      <div class="stat-card accent-red" style="--sd:.16s">
+        <div class="stat-label">↓ Lower Circuit</div>
+        <div class="stat-value" id="statLower">—</div>
+      </div>
+      <div class="stat-card" style="--sd:.2s">
+        <div class="stat-label">52W High</div>
+        <div class="stat-value" id="stat52H">—</div>
+      </div>
+      <div class="stat-card" style="--sd:.24s">
+        <div class="stat-label">52W Low</div>
+        <div class="stat-value" id="stat52L">—</div>
+      </div>
+    </div>
+
+    <!-- 52W Range Bar -->
+    <div id="rangeSection" class="range-section hidden">
+      <div class="range-header">
+        <span class="range-title">52-Week Price Range</span>
+        <span id="rangePos" class="range-pos-label">—</span>
+      </div>
+      <div class="range-track">
+        <div id="rangeFill" class="range-fill"></div>
+        <div id="rangePin" class="range-pin"></div>
+      </div>
+      <div class="range-ends">
+        <span id="rangeLow" class="re-low">—</span>
+        <span id="rangeHigh" class="re-high">—</span>
+      </div>
+    </div>
+
+    <!-- Futures Extra -->
+    <div id="futuresExtra" class="futures-extra hidden">
+      <div class="stat-card fut-card">
+        <div class="stat-label">Expiry Date</div>
+        <div class="stat-value" id="futExpiry">—</div>
+      </div>
+      <div class="stat-card fut-card">
+        <div class="stat-label">Lot Size</div>
+        <div class="stat-value" id="futLotSize">—</div>
+      </div>
+      <div class="stat-card fut-card">
+        <div class="stat-label">Contract Value</div>
+        <div class="stat-value" id="futContract">—</div>
+      </div>
+    </div>
+
+    <!-- Circuit Concept -->
+    <div class="concept-card">
+      <div class="concept-ico">📊</div>
+      <div>
+        <div class="concept-title">Circuit Limits Explained</div>
+        <p class="concept-text">The exchange sets upper and lower price boundaries each morning based on the previous
+          close. If a stock <strong>hits its upper circuit</strong>, it cannot trade above that level for the rest of
+          the day — preventing panic buying. The <strong>lower circuit</strong> stops panic selling. The ±20% here is
+          SEBI's standard rule for most stocks.</p>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-section">
+      <div class="section-header">
+        <div class="section-title">30-Day Price Chart</div>
+        <div id="chartMeta" class="chart-meta hidden">
+          <span>30D High <strong id="cm30H">—</strong></span>
+          <span>30D Low <strong id="cm30L">—</strong></span>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="priceChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Product + Order Type -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="section-title">Product Type</div>
+        <div class="tab-group">
+          <button class="tab active" onclick="selectProduct('CNC',this)">CNC</button>
+          <button class="tab" onclick="selectProduct('MIS',this)">MIS</button>
+          <button class="tab" onclick="selectProduct('NRML',this)">NRML</button>
+        </div>
+        <div id="productDesc" class="desc-box">
+          <div class="desc-title">Cash and Carry (CNC)</div>
+          <div class="desc-body">Full payment required upfront. Shares are delivered to your demat account. Best for
+            investors holding for multiple days. No leverage — you own the shares outright.</div>
+          <div class="desc-chips"><span class="chip">Delivery</span><span class="chip">Multi-day</span><span
+              class="chip">No Leverage</span></div>
+        </div>
+        <div class="concept-card mini">
+          <div class="concept-ico">💡</div>
+          <div>
+            <div class="concept-title">Product Types</div>
+            <p class="concept-text">₹10,000 of shares: <strong>CNC</strong> = pay full ₹10,000. <strong>MIS</strong> (5×
+              leverage) = pay ₹2,000 but close by 3:30 PM. <strong>NRML</strong> = 20% margin, hold overnight for
+              F&amp;O.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">Order Type</div>
+        <div class="select-wrap">
+          <select id="orderTypeSelect" class="dropdown" onchange="selectOrderType()">
+            <option value="MARKET">Market Order</option>
+            <option value="LIMIT">Limit Order</option>
+            <option value="SL">SL — Stop Loss</option>
+            <option value="SLM">SL-M — Stop Loss Market</option>
+          </select>
+          <span class="select-arrow">▾</span>
+        </div>
+        <div id="orderDesc" class="desc-box">
+          <div class="desc-title">Market Order</div>
+          <div class="desc-body">Executes immediately at the current market price. Speed is prioritised over price
+            precision. Use when you need guaranteed execution right now.</div>
+          <div class="desc-chips"><span class="chip">Instant</span><span class="chip">Any Price</span><span
+              class="chip">Guaranteed Fill</span></div>
+        </div>
+        <div class="concept-card mini">
+          <div class="concept-ico">💡</div>
+          <div>
+            <div class="concept-title">Order Types</div>
+            <p class="concept-text"><strong>Market</strong> = buy at any price now. <strong>Limit</strong> = only at
+              ₹480 or lower. <strong>Stop Loss</strong> = "if it falls below ₹470, sell automatically."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calculator -->
+    <div class="calc-section">
+      <div class="section-title">Order Value Calculator</div>
+      <div class="calc-body">
+        <div class="calc-field">
+          <label class="calc-label" id="qtyLabel">Quantity (shares)</label>
+          <input type="number" id="qtyInput" class="calc-input" value="1" min="1" oninput="calcAmount()" />
+        </div>
+        <div class="calc-field">
+          <label class="calc-label">Product Type</label>
+          <div class="calc-product-tag" id="calcProductDisplay">CNC</div>
+        </div>
+        <div class="calc-equals">＝</div>
+        <div class="calc-result-block">
+          <div class="calc-result-label">Estimated Amount Required</div>
+          <div id="calcResult" class="calc-result">₹ —</div>
+          <div id="calcFormula" class="calc-formula">Search a symbol to calculate</div>
+        </div>
+      </div>
+      <div class="concept-card mini" style="margin-top:22px">
+        <div class="concept-ico">💡</div>
+        <div>
+          <div class="concept-title">Calculation Logic</div>
+          <p class="concept-text"><strong>CNC:</strong> LTP × Qty &nbsp;·&nbsp; <strong>MIS:</strong> (LTP × Qty) ÷ 5
+            &nbsp;·&nbsp; <strong>NRML:</strong> (LTP × Qty) × 20%</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="export-section">
+      <button class="export-btn" id="exportBtn" onclick="exportExcel()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        Download as Excel
+      </button>
+      <p class="export-hint">Two-sheet .xlsx · Stock Details &amp; Order Summary</p>
+    </div>
+
+  </main>
+
+  <!-- ====== FOOTER ====== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-brand">StockPulse</span>
+      <span class="fdot">·</span>
+      <span>Data via NSE India</span>
+      <span class="fdot">·</span>
+      <span>Educational use only — not financial advice</span>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
