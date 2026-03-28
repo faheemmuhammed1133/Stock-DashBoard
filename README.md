@@ -6,9 +6,7 @@ A Flask + Python web application for real-time Indian stock market data (NSE/BSE
 
 ## 🌐 Live URL
 
-> Deploy to Railway (see deployment section below) and paste your URL here.
-> Example: `https://stockpulse-production.up.railway.app`
-
+> https://web-production-d1467.up.railway.app/
 ---
 
 ## 📦 Tech Stack
