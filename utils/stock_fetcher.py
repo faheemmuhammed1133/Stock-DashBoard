@@ -273,51 +273,66 @@ def _fetch_index(base: str, nse_name: str) -> dict:
     }
 
 
-# ── BSE SENSEX Handling ────────────────────────────
 def _fetch_sensex() -> dict:
+    """Fetch SENSEX using yfinance (BSE index is not available on NSE API)."""
     try:
-        import requests
-        
-        # Fetch live metrics from TradingView (uncapped, highly reliable)
-        tv_url = "https://scanner.tradingview.com/india/scan"
-        payload = {
-            "symbols": {"tickers": ["BSE:SENSEX"]},
-            "columns": ["close", "change", "change_abs", "open", "high", "low"]
-        }
-        res = requests.post(tv_url, json=payload, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        
-        if res.status_code == 200 and res.json().get("data"):
-            data_points = res.json()["data"][0]["d"]
-            ltp = data_points[0]
-            pchange = data_points[1]
-            change = data_points[2]
-            open_p = data_points[3]
-            day_high = data_points[4]
-            day_low = data_points[5]
-            prev_close = ltp - change
+        import yfinance as yf
+        import pandas as pd
+
+        df = yf.download(
+            "^BSESN", period="5d", interval="1d",
+            progress=False, auto_adjust=True, threads=False,
+        )
+        if df is None or df.empty:
+            return {"error": "Could not fetch SENSEX data. Please retry in a moment."}
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        ltp = round(float(df["Close"].iloc[-1]), 2)
+        prev_close = round(float(df["Close"].iloc[-2]), 2) if len(df) >= 2 else ltp
+        open_p = round(float(df["Open"].iloc[-1]), 2)
+        day_high = round(float(df["High"].iloc[-1]), 2)
+        day_low = round(float(df["Low"].iloc[-1]), 2)
+
+        # Get 52-week range from 1y data
+        df_year = yf.download(
+            "^BSESN", period="1y", interval="1d",
+            progress=False, auto_adjust=True, threads=False,
+        )
+        if df_year is not None and not df_year.empty:
+            if isinstance(df_year.columns, pd.MultiIndex):
+                df_year.columns = df_year.columns.get_level_values(0)
+            hi52 = round(float(df_year["High"].max()), 2)
+            lo52 = round(float(df_year["Low"].min()), 2)
+        else:
             hi52 = day_high
             lo52 = day_low
-        else:
-            return {"error": "SENSEX data unavailable currently."}
+
+        change = round(ltp - prev_close, 2)
+        pchange = round((change / prev_close) * 100, 2) if prev_close else 0
 
         return {
             "script_name": "BSE SENSEX",
             "symbol": "SENSEX",
-            "ltp": round(ltp, 2),
-            "open": round(open_p, 2),
-            "close": round(prev_close, 2),
-            "day_high": round(day_high, 2),
-            "day_low": round(day_low, 2),
-            "week_52_high": round(hi52, 2),
-            "week_52_low": round(lo52, 2),
+            "ltp": ltp,
+            "open": open_p,
+            "close": prev_close,
+            "day_high": day_high,
+            "day_low": day_low,
+            "week_52_high": hi52,
+            "week_52_low": lo52,
             "upper_circuit": "N/A (Index)",
             "lower_circuit": "N/A (Index)",
-            "change": round(change, 2),
-            "pchange": round(pchange, 2),
+            "change": change,
+            "pchange": pchange,
             "instrument_type": "index",
             "index_note": "Indices cannot be bought directly. Trade via Futures or Options.",
         }
     except Exception as e:
+        # Gracefully handle yfinance rate limit errors
+        if "RateLimitError" in str(type(e).__name__):
+            return {"error": "Yahoo Finance rate limit reached. Please wait a moment."}
         return {"error": f"Could not fetch SENSEX data: {str(e)}"}
 
 
@@ -343,54 +358,36 @@ def _fetch_futures(base: str) -> dict:
 def _fetch_chart_data(symbol: str, itype: str, nse_name: str = None) -> list:
     """
     Fetch 30-day historical close prices for the chart.
-    Uses direct requests to Yahoo Finance API to bypass library-level rate limits.
+    Uses yfinance as it's the most reliable for historical EOD data.
     """
     try:
-        import requests
-        from datetime import datetime
+        import yfinance as yf
 
         if itype == "index" and nse_name:
             yf_sym = YF_INDEX_MAP.get(nse_name, f"{symbol}.NS")
         else:
             yf_sym = f"{symbol}.NS"
 
-        # Direct API call to Yahoo Finance chart endpoint
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}?range=1mo&interval=1d"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "*/*",
-            "Origin": "https://finance.yahoo.com",
-            "Referer": f"https://finance.yahoo.com/quote/{yf_sym}"
-        }
-        res = requests.get(url, headers=headers, timeout=10)
-        if res.status_code != 200:
-            print(f"Chart API failed for {yf_sym}: {res.status_code}")
+        df = yf.download(
+            yf_sym, period="2mo", interval="1d",
+            progress=False, auto_adjust=True, threads=False,
+        )
+        if df is None or df.empty:
             return []
 
-        data = res.json()
-        result = data.get("chart", {}).get("result", [])
-        if not result:
-            return []
+        # Handle MultiIndex columns
+        import pandas as pd
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
 
-        timestamps = result[0].get("timestamp", [])
-        close_prices = result[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
-
-        if not timestamps or not close_prices:
-            return []
-
-        # Zip and format (filtering out None values)
-        chart_data = []
-        for ts, price in zip(timestamps, close_prices):
-            if price is not None:
-                dt = datetime.fromtimestamp(ts)
-                chart_data.append({
-                    "date": dt.strftime("%Y-%m-%d"),
-                    "close": round(float(price), 2)
-                })
-
-        return chart_data[-30:] # Return last 30 points
+        chart_df = df.tail(30)
+        return [
+            {"date": str(idx.date()), "close": round(float(row["Close"]), 2)}
+            for idx, row in chart_df.iterrows()
+        ]
     except Exception as e:
-        print(f"Chart fetch error: {str(e)}")
+        # Catch YFRateLimitError and others gracefully
+        print(f"Chart fetch failed: {e}")
         return []
 
 
