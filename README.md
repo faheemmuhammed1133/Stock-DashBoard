@@ -1,142 +1,109 @@
-# StockPulse — Stock Market Dashboard
+# StockPulse — Indian Stock Market Dashboard
 
-A Flask + Python web application for real-time Indian stock market data (NSE/BSE), interactive trading concept explanations, order value calculations, and Excel export.
+StockPulse is a modern, real-time web application designed to bring the Indian stock market (NSE/BSE) to your fingertips. Built with a sleek, dark-themed user interface, it provides live market quotes, educational trading concepts, live order value calculations, and comprehensive market explorers.
 
 ---
 
 ## 🌐 Live URL
 
 > https://web-production-d1467.up.railway.app/
----
-
-## 📦 Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Flask 3.0 (Python) |
-| Data API | yfinance (Yahoo Finance — free, no API key needed) |
-| Excel | openpyxl |
-| Charts | Chart.js |
-| Hosting | Railway (free tier) |
 
 ---
 
-## 🔑 Why These APIs?
+## 📖 About the Project
 
-**yfinance** was chosen because:
-- Completely free, no API key required
-- Supports NSE (`.NS`) and BSE (`.BO`) tickers natively
-- Provides LTP, Open, Close, 52-Week High/Low, historical data
-- Actively maintained, widely used in production dashboards
+StockPulse serves as an interactive financial sandbox. It empowers users to explore Indian equities, indices, and derivatives (Futures & Options) without requiring complex broker terminals. 
 
-**Note on Circuit Limits:** Yahoo Finance does not expose upper/lower circuit limits directly (NSE restricts this data). The app calculates approximate ±20% circuit limits from the previous close, which is the standard SEBI rule for most stocks. For exact limits, an NSE-authorized vendor (e.g., TrueData, Global Datafeeds) would be needed.
+### How it Works
+1. **Frontend:** A responsive UI built with vanilla HTML/CSS/JS, featuring glassmorphism elements, real-time autocomplete, and paginated data tables. 
+2. **Backend:** A lightweight Flask server acts as an API gateway. It safely proxies requests to live market APIs, manages local caching to prevent rate-limiting, and handles complex calculations like Excel file generation.
+3. **Data Flow:** When a user searches for a stock or navigates to an explorer tab, the frontend requests data from the Flask API. The backend fetches this data from the upstream sources, parses/formats it into a clean JSON structure, and returns it to the client for rendering.
+
+### How to Use It
+- **Search:** Use the main search bar to find any NSE equity. As you type, the autocomplete engine will suggest relevant stocks, indices, and futures.
+- **Market Explorer:** Browse the NIFTY 500 universe to discover the most liquid Indian securities. 
+- **F&O Explorer:** Switch to the F&O tab to view active derivatives contracts (Futures) currently trading on the market.
+- **Order Calculator:** Once a stock is selected, use the calculator module to estimate margins for different product types (CNC, MIS, NRML) and understand order types (Market, Limit, SL).
+- **Export:** Click the "Download as Excel" button to export an offline snapshot of the asset's current metrics and your calculated order summary.
+
+---
+
+## 🛠 Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| **Backend** | Python 3.12, Flask 3.0 |
+| **Frontend** | HTML5, Vanilla CSS3 (Custom Variables/Flexbox), Vanilla JavaScript |
+| **Data Fetching** | `requests` (with Session Management) |
+| **Historical Data**| `yfinance` |
+| **Data Export** | `openpyxl` |
+
+---
+
+## 📡 API & Data Sources
+
+StockPulse utilizes a hybrid data-fetching strategy to ensure reliability and speed:
+
+1. **NSE India Unofficial API (Primary):** Used for real-time market data, autocomplete suggestions, and derivative quotes. The backend implements session and cookie managers to seamlessly communicate with the regular NSE public endpoints without requiring authentication.
+2. **Yahoo Finance (`yfinance`) (Fallback/Historical):** Used to fetch the 30-day historical plot data for the interactive chart, and utilized as a bridge for extracting data for the BSE SENSEX index (which is unavailable natively on NSE). Graceful error handling is implemented to prevent rate-limit crashes.
+
+### Internal API Endpoints
+
+The Flask backend exposes the following RESTful endpoints to the client:
+
+- `GET /api/search?q={query}`
+  Returns a list of autocomplete suggestions (Symbol, Name, Type) matching the user's input.
+- `GET /api/stock?symbol={symbol}`
+  Fetches the complete real-time dashboard data for a single equity or futures contract. Includes LTP, limits, and 30-day OHLC chart data.
+- `GET /api/market-list?type={fno|all}&page={page}`
+  Returns a paginated list of either Active Futures Contracts (`type=fno`) or NIFTY 500 Equities (`type=all`).
+- `POST /api/export`
+  Accepts a JSON payload of the current dashboard state and returns a generated `.xlsx` Excel file stream.
 
 ---
 
 ## 🚀 Local Setup
 
-### 1. Clone the repo
+**1. Clone the repository**
 ```bash
 git clone <your-repo-url>
 cd stock-dashboard
 ```
 
-### 2. Create virtual environment
+**2. Set up the Python Environment**
 ```bash
-python -m venv venv
-source venv/bin/activate      # Linux/Mac
+python3 -m venv venv
+source venv/bin/activate      # Mac/Linux
 venv\Scripts\activate         # Windows
 ```
 
-### 3. Install dependencies
+**3. Install Dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run locally
+**4. Run the Development Server**
 ```bash
 flask run
+# Or purely via python:
+python3 app.py
 ```
-Visit: http://localhost:5000
+*Visit `http://localhost:5000` in your browser.*
 
 ---
 
-## ☁️ Deployment on Railway (Free Tier)
+## 🔮 Future Improvements Needed
 
-Railway offers a free hobby plan perfect for this project.
+To make StockPulse production-ready and expand its capabilities, the following enhancements are recommended:
 
-### Steps:
-
-1. **Push to GitHub**
-   ```bash
-   git init
-   git add .
-   git commit -m "initial commit"
-   git remote add origin <your-github-repo-url>
-   git push -u origin main
-   ```
-
-2. **Create Railway account**
-   - Go to [railway.app](https://railway.app)
-   - Sign up / login with GitHub
-
-3. **New Project → Deploy from GitHub Repo**
-   - Select your repository
-   - Railway auto-detects Python and installs from `requirements.txt`
-
-4. **Set Start Command** (in Railway service settings):
-   ```
-   gunicorn app:app --bind 0.0.0.0:$PORT --workers 2
-   ```
-   Or Railway will use the `Procfile` automatically.
-
-5. **Generate Domain**
-   - Go to **Settings → Networking → Generate Domain**
-   - Your app is now live at `https://your-app.up.railway.app`
-
-### Alternative: Render.com
-1. Go to [render.com](https://render.com)
-2. New → Web Service → Connect GitHub repo
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `gunicorn app:app`
-5. Free tier gives you a public URL instantly.
-
----
-
-## 📁 Project Structure
-
-```
-stock-dashboard/
-├── app.py                  # Flask entry point — routes
-├── requirements.txt        # Python dependencies
-├── Procfile               # Production server command
-├── templates/
-│   └── index.html         # Main UI template
-├── static/
-│   ├── style.css          # Dark fintech styling
-│   └── script.js          # Client-side interactivity
-├── utils/
-│   ├── stock_fetcher.py   # All yfinance API logic
-│   └── excel_exporter.py  # Excel generation logic
-└── README.md
-```
-
----
-
-## 🎯 Features
-
-- **Stock Search** — Equity, Index (NIFTY50, SENSEX), and Futures (RELIANCE FUT)
-- **Real-time Data** — LTP, Open, Close, 52W High/Low, approximate Circuit Limits
-- **Product Type Panel** — CNC / MIS / NRML with explanations (tab-based, no reload)
-- **Order Type Panel** — Market / Limit / SL / SL-M with explanations (dropdown, no reload)
-- **Live Calculator** — Instant estimated margin/amount for the selected product type
-- **30-Day Price Chart** — Interactive Chart.js line chart
-- **Session History** — Last 5 searched symbols remembered in session
-- **Excel Export** — Two-sheet XLSX: Stock Details + Order Summary
-- **Error Handling** — Invalid symbols, API failures, and network errors handled gracefully
+1. **Official Broker API Integration:** Transition from unofficial public APIs (NSE/Yahoo) to an official broker API (e.g., Upstox, Zerodha Kite Connect, or AngelOne) to ensure strict adherence to exchange compliances, guarantee uptime, and access precise circuit limits.
+2. **WebSocket Live Streams:** Currently, the dashboard requires a manual refresh or a re-search to update the Last Traded Price (LTP). Implementing a WebSocket connection would allow prices to tick in real-time.
+3. **Advanced Charting:** Replace the static Chart.js implementation with a robust financial charting library like Lightweight Charts (TradingView) to support candlestick formats, volume bars, and technical indicators.
+4. **Options Chain Integration:** Expand the F&O Explorer to include a full Options Chain, allowing users to analyze specific Call (CE) and Put (PE) strike prices and their respective implied volatilities/Greeks.
+5. **Database Caching Layer:** Replace the in-memory Python dictionary cache (`_CACHE`) with a distributed memory store like Redis to improve performance across multiple server workers.
 
 ---
 
 ## ⚠️ Disclaimer
 
-Data is sourced from Yahoo Finance via yfinance for educational purposes only. Not financial advice.
+All financial data displayed in this application is sourced from public endpoints and is strictly intended for **educational and demonstrative purposes only**. It should not be construed as financial advice or used for live algorithmic trading.

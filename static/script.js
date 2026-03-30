@@ -79,6 +79,8 @@ async function doSearch() {
       showError(data.error);
     } else {
       currentStock = data;
+      switchTab('dashboard'); // ensure the dashboard is showing
+      document.getElementById("dashboard").classList.remove("hidden");
       renderDashboard(data);
     }
   } catch {
@@ -419,10 +421,15 @@ async function exportExcel() {
 // ── UI Helpers ─────────────────────────────────────
 function setLoading(on) {
   document.getElementById("searchBtn").disabled = on;
-  document.getElementById("searchBtnLabel").textContent = on ? "…" : "SEARCH";
-  document.getElementById("skeleton").classList.toggle("hidden", !on);
+  
+  const overlay = document.getElementById("globalLoadingOverlay");
+  if (overlay) {
+    if (on) overlay.classList.remove("hidden");
+    else overlay.classList.add("hidden");
+  }
 }
 function hideDashboard() {
+  document.getElementById("dashboardView").classList.remove("active-view");
   document.getElementById("dashboard").classList.add("hidden");
   const meta = document.getElementById("chartMeta");
   if (meta) meta.classList.add("hidden");
@@ -434,4 +441,134 @@ function showError(msg) {
 }
 function hideError() {
   document.getElementById("errorBanner").classList.add("hidden");
+}
+
+// ── Tab Navigation ─────────────────────────────────
+function switchTab(tabId) {
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".view-section").forEach(v => v.classList.remove("active-view"));
+  
+  const tabBtn = document.querySelector(`.nav-tab[onclick*="${tabId}"]`);
+  if (tabBtn) tabBtn.classList.add("active");
+  
+  if (tabId === 'dashboard') {
+    document.getElementById("dashboardView").classList.add("active-view");
+  } else if (tabId === 'fno') {
+    document.getElementById("fnoView").classList.add("active-view");
+    if (fnoPage === 1) loadMarketData('fno');
+  } else if (tabId === 'all') {
+    document.getElementById("marketView").classList.add("active-view");
+    if (marketPage === 1) loadMarketData('all');
+  }
+}
+
+// ── Autocomplete ───────────────────────────────────
+let debounceTimer;
+const searchInput = document.getElementById("symbolInput");
+const autocompleteList = document.getElementById("autocompleteList");
+
+searchInput.addEventListener("input", (e) => {
+  clearTimeout(debounceTimer);
+  const q = e.target.value.trim();
+  
+  if (q.length < 1) {
+    autocompleteList.classList.add("hidden");
+    return;
+  }
+  
+  debounceTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      renderAutocomplete(data.results);
+    } catch (err) {
+      console.error("Autocomplete failed", err);
+    }
+  }, 350);
+});
+
+function renderAutocomplete(results) {
+  if (!results || results.length === 0) {
+    autocompleteList.classList.add("hidden");
+    return;
+  }
+  
+  autocompleteList.innerHTML = "";
+  results.forEach(item => {
+    const li = document.createElement("li");
+    li.className = "autocomplete-item";
+    li.innerHTML = `
+      <span class="ac-sym">${item.symbol}</span>
+      <span class="ac-name">${item.name}</span>
+      <span class="ac-type ${item.type.toLowerCase()}">${item.type}</span>
+    `;
+    li.onmousedown = () => {
+      searchInput.value = item.symbol;
+      autocompleteList.classList.add("hidden");
+      switchTab('dashboard');
+      doSearch();
+    };
+    autocompleteList.appendChild(li);
+  });
+  
+  autocompleteList.classList.remove("hidden");
+}
+
+// Hide autocomplete when clicking outside
+document.addEventListener("mousedown", (e) => {
+  if (!e.target.closest(".search-bar-wrap")) {
+    autocompleteList.classList.add("hidden");
+  }
+});
+
+// ── Market Explorer Data ───────────────────────────
+let fnoPage = 1;
+let marketPage = 1;
+
+async function loadMarketData(type) {
+  const isFno = type === 'fno';
+  const page = isFno ? fnoPage : marketPage;
+  const btn = document.getElementById(isFno ? "fnoLoadBtn" : "marketLoadBtn");
+  const tbody = document.querySelector(isFno ? "#fnoTable tbody" : "#marketTable tbody");
+  
+  btn.disabled = true;
+  btn.textContent = "Loading...";
+
+  try {
+    const res = await fetch(`/api/market-list?type=${type}&page=${page}`);
+    const data = await res.json();
+    
+    if (data.error) throw new Error(data.error);
+    
+    data.items.forEach(item => {
+      const tr = document.createElement("tr");
+      const chgClass = item.change > 0 ? "up" : item.change < 0 ? "dn" : "neutral";
+      tr.innerHTML = `
+        <td class="mt-sym">${item.symbol}</td>
+        <td class="mt-name">${item.name}</td>
+        <td class="ta-right mt-ltp">₹${item.ltp.toLocaleString("en-IN", {minimumFractionDigits: 2})}</td>
+        <td class="ta-right"><span class="mt-chg ${chgClass}">${item.change > 0 ? "+" : ""}${item.change.toFixed(2)} (${item.pchange}%)</span></td>
+      `;
+      tr.onclick = () => {
+        searchInput.value = item.symbol;
+        switchTab('dashboard');
+        doSearch();
+        window.scrollTo(0,0);
+      };
+      tbody.appendChild(tr);
+    });
+    
+    if (data.has_more) {
+      if (isFno) fnoPage++; else marketPage++;
+      btn.textContent = "Load More";
+      btn.disabled = false;
+    } else {
+      btn.textContent = "All Caught Up";
+      btn.disabled = true;
+    }
+    
+  } catch (err) {
+    btn.textContent = "Error Loading";
+    console.error(err);
+  }
 }

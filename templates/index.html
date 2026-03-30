@@ -60,8 +60,24 @@
     </div>
   </header>
 
-  <!-- ====== HERO SEARCH ====== -->
-  <section class="search-section">
+  <!-- ====== GLOBAL LOADING OVERLAY ====== -->
+  <div id="globalLoadingOverlay" class="global-loader-wrap hidden">
+    <div class="global-spinner"></div>
+  </div>
+
+  <!-- ====== MAIN TABS ====== -->
+  <div class="tabs-bar">
+    <div class="container tabs-container">
+      <button class="nav-tab active" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="nav-tab" onclick="switchTab('fno')">F&O Explorer</button>
+      <button class="nav-tab" onclick="switchTab('all')">Market Explorer</button>
+    </div>
+  </div>
+
+  <!-- ====== DASHBOARD VIEW ====== -->
+  <div id="dashboardView" class="view-section active-view">
+    <!-- HERO SEARCH -->
+    <section class="search-section">
     <div class="container">
       <div class="hero-text">
         <h2 class="hero-title">Indian Market Dashboard</h2>
@@ -71,14 +87,17 @@
 
       <div class="search-bar-wrap">
         <div class="search-icon-wrap">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
             stroke-linecap="round">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
           </svg>
         </div>
-        <input type="text" id="symbolInput" class="search-input" placeholder="RELIANCE · NIFTY50 · TATAMOTORS FUT…"
-          autocomplete="off" spellcheck="false" />
+        <div style="position: relative; flex: 1; display:flex;">
+          <input type="text" id="symbolInput" class="search-input" placeholder="SENSEX"
+            autocomplete="off" spellcheck="false" />
+          <ul id="autocompleteList" class="autocomplete-list hidden"></ul>
+        </div>
         <button class="search-btn" id="searchBtn" onclick="doSearch()">
           <span id="searchBtnLabel">SEARCH</span>
         </button>
@@ -397,6 +416,54 @@
     </div>
 
   </main>
+  </div><!-- /#dashboardView -->
+
+  <!-- ====== EXPLORER VIEWS ====== -->
+  <div id="fnoView" class="view-section container">
+    <div class="explorer-header">
+      <h2>F&O Securities</h2>
+      <p>Browse stocks and indices available for Futures & Options trading.</p>
+    </div>
+    <div class="table-wrap">
+      <table class="market-table" id="fnoTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Company Name</th>
+            <th class="ta-right">LTP</th>
+            <th class="ta-right">Change</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="load-more-wrap">
+      <button class="load-more-btn" id="fnoLoadBtn" onclick="loadMarketData('fno')">Load More</button>
+    </div>
+  </div>
+
+  <div id="marketView" class="view-section container">
+    <div class="explorer-header">
+      <h2>Market Explorer</h2>
+      <p>Browse the NIFTY 500 universe — India's top 500 largest/most liquid securities.</p>
+    </div>
+    <div class="table-wrap">
+      <table class="market-table" id="marketTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Company Name</th>
+            <th class="ta-right">LTP</th>
+            <th class="ta-right">Change</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="load-more-wrap">
+      <button class="load-more-btn" id="marketLoadBtn" onclick="loadMarketData('all')">Load More</button>
+    </div>
+  </div>
 
   <!-- ====== FOOTER ====== -->
   <footer class="footer">

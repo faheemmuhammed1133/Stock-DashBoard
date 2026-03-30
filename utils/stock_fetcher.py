@@ -459,23 +459,42 @@ def search_symbols(query: str) -> list:
 # ── Market Explorer (All Stocks & F&O) ─────────────
 def fetch_market_list(list_type: str, page: int = 1, limit: int = 50) -> dict:
     """Fetch paginated lists for F&O or Nifty 500."""
-    if list_type == "fno":
-        index_name = "SECURITIES IN F&O"
-    else:
-        index_name = "NIFTY 500"
-
     cache_key = f"market_list_{list_type}"
     cached = _CACHE.get(cache_key)
 
     if not cached or time.time() - cached["ts"] > 1800: # Cache for 30 mins
         try:
-            data = _nse_get(f"/api/equity-stockIndices?index={requests.utils.quote(index_name)}")
-            if data and "data" in data:
-                # First element is usually the index itself, filter it out
-                items = [item for item in data["data"] if item.get("symbol") != index_name]
+            if list_type == "fno":
+                # Fetch real derivatives data instead of just the equity index
+                items = []
+                for index_name in ['nse50_fut', 'nifty_bank_fut', 'stock_fut']:
+                    data = _nse_get(f"/api/liveEquity-derivatives?index={index_name}")
+                    if data and "data" in data:
+                        for row in data["data"]:
+                            sym = row.get("underlying")
+                            if sym == "NIFTY":
+                                items.append({"symbol": "NIFTY FUT", "name": "NIFTY 50 Futures", "lastPrice": row.get("lastPrice"), "change": row.get("change"), "pChange": row.get("pChange"), "totalTradedVolume": row.get("volume")})
+                            elif sym == "BANKNIFTY":
+                                items.append({"symbol": "BANKNIFTY FUT", "name": "Nifty Bank Futures", "lastPrice": row.get("lastPrice"), "change": row.get("change"), "pChange": row.get("pChange"), "totalTradedVolume": row.get("volume")})
+                            else:
+                                items.append({
+                                    "symbol": f"{sym} FUT",
+                                    "name": NAME_MAP.get(sym, f"{sym} Futures"),
+                                    "lastPrice": row.get("lastPrice"),
+                                    "change": row.get("change"),
+                                    "pChange": row.get("pChange"),
+                                    "totalTradedVolume": row.get("volume")
+                                })
                 _CACHE[cache_key] = {"data": items, "ts": time.time()}
             else:
-                _CACHE[cache_key] = {"data": [], "ts": time.time()}
+                index_name = "NIFTY 500"
+                data = _nse_get(f"/api/equity-stockIndices?index={requests.utils.quote(index_name)}")
+                if data and "data" in data:
+                    # Filter out the index itself
+                    items = [item for item in data["data"] if item.get("symbol") != index_name]
+                    _CACHE[cache_key] = {"data": items, "ts": time.time()}
+                else:
+                    _CACHE[cache_key] = {"data": [], "ts": time.time()}
         except Exception as e:
             return {"error": f"Failed to fetch market list: {str(e)}"}
             
@@ -488,9 +507,12 @@ def fetch_market_list(list_type: str, page: int = 1, limit: int = 50) -> dict:
 
     formatted = []
     for item in paginated:
+        symbol = item.get("symbol", "")
+        # NIFTY 500 equities have meta company names, futures use our explicit name logic
+        name = item.get("name", NAME_MAP.get(symbol, item.get("meta", {}).get("companyName", symbol)))
         formatted.append({
-            "symbol": item.get("symbol", ""),
-            "name": NAME_MAP.get(item.get("symbol", ""), item.get("meta", {}).get("companyName", item.get("symbol", ""))),
+            "symbol": symbol,
+            "name": name,
             "ltp": round(_sf(item.get("lastPrice")), 2),
             "change": round(_sf(item.get("change")), 2),
             "pchange": round(_sf(item.get("pChange")), 2),
