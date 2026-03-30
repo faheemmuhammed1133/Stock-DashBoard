@@ -273,66 +273,51 @@ def _fetch_index(base: str, nse_name: str) -> dict:
     }
 
 
+# ── BSE SENSEX Handling ────────────────────────────
 def _fetch_sensex() -> dict:
-    """Fetch SENSEX using yfinance (BSE index is not available on NSE API)."""
     try:
-        import yfinance as yf
-        import pandas as pd
-
-        df = yf.download(
-            "^BSESN", period="5d", interval="1d",
-            progress=False, auto_adjust=True, threads=False,
-        )
-        if df is None or df.empty:
-            return {"error": "Could not fetch SENSEX data. Please retry in a moment."}
-
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-
-        ltp = round(float(df["Close"].iloc[-1]), 2)
-        prev_close = round(float(df["Close"].iloc[-2]), 2) if len(df) >= 2 else ltp
-        open_p = round(float(df["Open"].iloc[-1]), 2)
-        day_high = round(float(df["High"].iloc[-1]), 2)
-        day_low = round(float(df["Low"].iloc[-1]), 2)
-
-        # Get 52-week range from 1y data
-        df_year = yf.download(
-            "^BSESN", period="1y", interval="1d",
-            progress=False, auto_adjust=True, threads=False,
-        )
-        if df_year is not None and not df_year.empty:
-            if isinstance(df_year.columns, pd.MultiIndex):
-                df_year.columns = df_year.columns.get_level_values(0)
-            hi52 = round(float(df_year["High"].max()), 2)
-            lo52 = round(float(df_year["Low"].min()), 2)
-        else:
+        import requests
+        
+        # Fetch live metrics from TradingView (uncapped, highly reliable)
+        tv_url = "https://scanner.tradingview.com/india/scan"
+        payload = {
+            "symbols": {"tickers": ["BSE:SENSEX"]},
+            "columns": ["close", "change", "change_abs", "open", "high", "low"]
+        }
+        res = requests.post(tv_url, json=payload, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        
+        if res.status_code == 200 and res.json().get("data"):
+            data_points = res.json()["data"][0]["d"]
+            ltp = data_points[0]
+            pchange = data_points[1]
+            change = data_points[2]
+            open_p = data_points[3]
+            day_high = data_points[4]
+            day_low = data_points[5]
+            prev_close = ltp - change
             hi52 = day_high
             lo52 = day_low
-
-        change = round(ltp - prev_close, 2)
-        pchange = round((change / prev_close) * 100, 2) if prev_close else 0
+        else:
+            return {"error": "SENSEX data unavailable currently."}
 
         return {
             "script_name": "BSE SENSEX",
             "symbol": "SENSEX",
-            "ltp": ltp,
-            "open": open_p,
-            "close": prev_close,
-            "day_high": day_high,
-            "day_low": day_low,
-            "week_52_high": hi52,
-            "week_52_low": lo52,
+            "ltp": round(ltp, 2),
+            "open": round(open_p, 2),
+            "close": round(prev_close, 2),
+            "day_high": round(day_high, 2),
+            "day_low": round(day_low, 2),
+            "week_52_high": round(hi52, 2),
+            "week_52_low": round(lo52, 2),
             "upper_circuit": "N/A (Index)",
             "lower_circuit": "N/A (Index)",
-            "change": change,
-            "pchange": pchange,
+            "change": round(change, 2),
+            "pchange": round(pchange, 2),
             "instrument_type": "index",
             "index_note": "Indices cannot be bought directly. Trade via Futures or Options.",
         }
     except Exception as e:
-        # Gracefully handle yfinance rate limit errors
-        if "RateLimitError" in str(type(e).__name__):
-            return {"error": "Yahoo Finance rate limit reached. Please wait a moment."}
         return {"error": f"Could not fetch SENSEX data: {str(e)}"}
 
 
