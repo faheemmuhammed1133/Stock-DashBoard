@@ -343,36 +343,54 @@ def _fetch_futures(base: str) -> dict:
 def _fetch_chart_data(symbol: str, itype: str, nse_name: str = None) -> list:
     """
     Fetch 30-day historical close prices for the chart.
-    Uses yfinance as it's the most reliable for historical EOD data.
+    Uses direct requests to Yahoo Finance API to bypass library-level rate limits.
     """
     try:
-        import yfinance as yf
+        import requests
+        from datetime import datetime
 
         if itype == "index" and nse_name:
             yf_sym = YF_INDEX_MAP.get(nse_name, f"{symbol}.NS")
         else:
             yf_sym = f"{symbol}.NS"
 
-        df = yf.download(
-            yf_sym, period="2mo", interval="1d",
-            progress=False, auto_adjust=True, threads=False,
-        )
-        if df is None or df.empty:
+        # Direct API call to Yahoo Finance chart endpoint
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}?range=1mo&interval=1d"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Origin": "https://finance.yahoo.com",
+            "Referer": f"https://finance.yahoo.com/quote/{yf_sym}"
+        }
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code != 200:
+            print(f"Chart API failed for {yf_sym}: {res.status_code}")
             return []
 
-        # Handle MultiIndex columns
-        import pandas as pd
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        data = res.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return []
 
-        chart_df = df.tail(30)
-        return [
-            {"date": str(idx.date()), "close": round(float(row["Close"]), 2)}
-            for idx, row in chart_df.iterrows()
-        ]
+        timestamps = result[0].get("timestamp", [])
+        close_prices = result[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+
+        if not timestamps or not close_prices:
+            return []
+
+        # Zip and format (filtering out None values)
+        chart_data = []
+        for ts, price in zip(timestamps, close_prices):
+            if price is not None:
+                dt = datetime.fromtimestamp(ts)
+                chart_data.append({
+                    "date": dt.strftime("%Y-%m-%d"),
+                    "close": round(float(price), 2)
+                })
+
+        return chart_data[-30:] # Return last 30 points
     except Exception as e:
-        # Catch YFRateLimitError and others gracefully
-        print(f"Chart fetch failed: {e}")
+        print(f"Chart fetch error: {str(e)}")
         return []
 
 
