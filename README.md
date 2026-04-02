@@ -6,7 +6,7 @@ StockPulse is a modern, real-time web application designed to bring the Indian s
 
 ## 🌐 Live URL
 
-> https://web-production-d1467.up.railway.app/
+>
 
 ---
 
